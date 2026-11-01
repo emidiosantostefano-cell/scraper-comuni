@@ -24,11 +24,10 @@ def estrai_bandi(nome_comune, url_bandi):
         soup = BeautifulSoup(response.text, 'html.parser')
         bandi_trovati = []
         
-        # LOGICA SPECIFICA PER SPOLTORE (Tabella)
-        # LOGICA SPECIFICA PER SPOLTORE (Tabella)
+        # LOGICA SPECIFICA PER SPOLTORE
         if nome_comune == "Spoltore":
             righe = soup.find_all('tr')
-            for riga in righe[1:]: # Salta la riga di intestazione
+            for riga in righe[1:]: 
                 colonne = riga.find_all('td')
                 if len(colonne) >= 4:
                     titolo = colonne[3].get_text(strip=True)
@@ -37,7 +36,7 @@ def estrai_bandi(nome_comune, url_bandi):
                     if link_tag and 'href' in link_tag.attrs:
                         link_bando = "https://albo.tinnvision.cloud/" + link_tag['href']
                     else:
-                        # Crea un link unico usando il numero di pubblicazione della prima colonna
+                        # Crea un link unico usando il numero di pubblicazione
                         id_pubb = colonne[0].get_text(strip=True).replace(' ', '').replace('/', '-')
                         link_bando = f"{url_bandi}&doc={id_pubb}"
                         
@@ -51,7 +50,7 @@ def estrai_bandi(nome_comune, url_bandi):
                             "link": link_bando
                         })
                         
-        # LOGICA UNIVERSALE PER MONTESILVANO E PESCARA (Card)
+        # LOGICA UNIVERSALE PER MONTESILVANO E PESCARA
         else:
             elementi_bando = soup.find_all('div', class_=lambda c: c and 'card' in c) 
             
