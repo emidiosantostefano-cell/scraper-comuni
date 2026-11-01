@@ -25,6 +25,7 @@ def estrai_bandi(nome_comune, url_bandi):
         bandi_trovati = []
         
         # LOGICA SPECIFICA PER SPOLTORE (Tabella)
+        # LOGICA SPECIFICA PER SPOLTORE (Tabella)
         if nome_comune == "Spoltore":
             righe = soup.find_all('tr')
             for riga in righe[1:]: # Salta la riga di intestazione
@@ -36,7 +37,9 @@ def estrai_bandi(nome_comune, url_bandi):
                     if link_tag and 'href' in link_tag.attrs:
                         link_bando = "https://albo.tinnvision.cloud/" + link_tag['href']
                     else:
-                        link_bando = url_bandi
+                        # Crea un link unico usando il numero di pubblicazione della prima colonna
+                        id_pubb = colonne[0].get_text(strip=True).replace(' ', '').replace('/', '-')
+                        link_bando = f"{url_bandi}&doc={id_pubb}"
                         
                     data = datetime.today().strftime('%d/%m/%Y')
                     
