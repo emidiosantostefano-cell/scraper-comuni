@@ -83,8 +83,10 @@ if __name__ == "__main__":
             "nome": "Pescara",
             "url": "https://comune.pescara.it/tipi_notizia/avvisi/"
         },
-			"nome": "Spoltore",
-		{   "url": "[https://albo.tinnvision.cloud/?ente=00128340684](https://albo.tinnvision.cloud/?ente=00128340684)"
+			
+		{   
+			"nome": "Pescara",
+		    "url": "[https://albo.tinnvision.cloud/?ente=00128340684](https://albo.tinnvision.cloud/?ente=00128340684)"
 		},
     ]
     
