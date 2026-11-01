@@ -31,14 +31,10 @@ def estrai_bandi(nome_comune, url_bandi):
                 colonne = riga.find_all('td')
                 if len(colonne) >= 4:
                     titolo = colonne[3].get_text(strip=True)
-                    link_tag = riga.find('a')
                     
-                    if link_tag and 'href' in link_tag.attrs:
-                        link_bando = "https://albo.tinnvision.cloud/" + link_tag['href']
-                    else:
-                        # Crea un link unico usando il numero di pubblicazione
-                        id_pubb = colonne[0].get_text(strip=True).replace(' ', '').replace('/', '-')
-                        link_bando = f"{url_bandi}&doc={id_pubb}"
+                    # IGNORIAMO i falsi link "#" e forziamo sempre un ID unico per ogni riga
+                    id_pubb = colonne[0].get_text(strip=True).replace(' ', '').replace('/', '-')
+                    link_bando = f"{url_bandi}&doc={id_pubb}"
                         
                     data = datetime.today().strftime('%d/%m/%Y')
                     
