@@ -1,0 +1,24 @@
+name: Scraper Bandi Notturno
+
+on:
+  schedule:
+    - cron: '0 3 * * *' # Esegue tutti i giorni alle 03:00 UTC (circa 04:00 o 05:00 in Italia)
+  workflow_dispatch: # Permette l'avvio manuale dal sito
+
+jobs:
+  estrai_dati:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clona il codice
+        uses: actions/checkout@v4
+
+      - name: Configura Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Installa le dipendenze
+        run: pip install supabase requests beautifulsoup4 urllib3
+
+      - name: Avvia lo scraper
+        run: python scraper.py
