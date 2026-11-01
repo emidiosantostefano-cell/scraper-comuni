@@ -12,7 +12,7 @@ SUPABASE_URL = "https://vdskoxutlhsdksbsplqp.supabase.co"
 SUPABASE_KEY = "sb_publishable_ENqtzU8uti18iFwlxF4IXQ_WgQ7cbOg" 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 2. Funzione di Scraping universale
+# 2. Funzione di Scraping
 def estrai_bandi(nome_comune, url_bandi):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] Cerco nuovi bandi per {nome_comune}...")
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
@@ -24,31 +24,53 @@ def estrai_bandi(nome_comune, url_bandi):
         soup = BeautifulSoup(response.text, 'html.parser')
         bandi_trovati = []
         
-        elementi_bando = soup.find_all('div', class_=lambda c: c and 'card' in c) 
-        
-        for elemento in elementi_bando:
-            titolo_tag = elemento.find('h3', class_='card-title')
-            
-            if titolo_tag:
-                titolo = titolo_tag.text.strip()
-                
-                # Cerca tutti i link (tag 'a') presenti all'interno del riquadro (card)
-                tutti_i_link = elemento.find_all('a', href=True)
-                
-                if tutti_i_link:
-                    # Seleziona il link con il percorso testuale più lungo (evita le etichette generiche)
-                    link_tag = max(tutti_i_link, key=lambda tag: len(tag['href']))
-                    link_grezzo = link_tag['href']
+        # LOGICA SPECIFICA PER SPOLTORE (Tabella)
+        if nome_comune == "Spoltore":
+            righe = soup.find_all('tr')
+            for riga in righe[1:]: # Salta la riga di intestazione
+                colonne = riga.find_all('td')
+                if len(colonne) >= 4:
+                    titolo = colonne[3].get_text(strip=True)
+                    link_tag = riga.find('a')
                     
-                    data = datetime.today().strftime('%d/%m/%Y')
-                    link_assoluto = urljoin(url_bandi, link_grezzo)
+                    if link_tag and 'href' in link_tag.attrs:
+                        link_bando = "https://albo.tinnvision.cloud/" + link_tag['href']
+                    else:
+                        link_bando = url_bandi
                         
-                    bandi_trovati.append({
-                        "comune": nome_comune,
-                        "titolo": titolo,
-                        "data_scadenza": data,
-                        "link": link_assoluto
-                    })
+                    data = datetime.today().strftime('%d/%m/%Y')
+                    
+                    if titolo:
+                        bandi_trovati.append({
+                            "comune": nome_comune, 
+                            "titolo": titolo,
+                            "data_scadenza": data,
+                            "link": link_bando
+                        })
+                        
+        # LOGICA UNIVERSALE PER MONTESILVANO E PESCARA (Card)
+        else:
+            elementi_bando = soup.find_all('div', class_=lambda c: c and 'card' in c) 
+            
+            for elemento in elementi_bando:
+                titolo_tag = elemento.find('h3', class_='card-title')
+                
+                if titolo_tag:
+                    titolo = titolo_tag.text.strip()
+                    tutti_i_link = elemento.find_all('a', href=True)
+                    
+                    if tutti_i_link:
+                        link_tag = max(tutti_i_link, key=lambda tag: len(tag['href']))
+                        link_grezzo = link_tag['href']
+                        data = datetime.today().strftime('%d/%m/%Y')
+                        link_assoluto = urljoin(url_bandi, link_grezzo)
+                            
+                        bandi_trovati.append({
+                            "comune": nome_comune,
+                            "titolo": titolo,
+                            "data_scadenza": data,
+                            "link": link_assoluto
+                        })
                     
         return bandi_trovati
         
@@ -71,6 +93,7 @@ def salva_bandi_supabase(bandi, nome_comune):
             
     print(f"-> {nome_comune}: Salvati {nuovi_inserimenti} nuovi bandi (su {len(bandi)} analizzati).")
 
+
 # --- MOTORE DI ESECUZIONE MULTIPLA ---
 if __name__ == "__main__":
     
@@ -83,11 +106,10 @@ if __name__ == "__main__":
             "nome": "Pescara",
             "url": "https://comune.pescara.it/tipi_notizia/avvisi/"
         },
-			
-		{   
-			"nome": "Pescara",
-		    "url": "[https://albo.tinnvision.cloud/?ente=00128340684](https://albo.tinnvision.cloud/?ente=00128340684)"
-		},
+        {   
+            "nome": "Spoltore",
+            "url": "https://albo.tinnvision.cloud/?ente=00128340684"
+        }
     ]
     
     print("Avvio scansione massiva...")
