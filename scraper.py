@@ -29,22 +29,22 @@ def estrai_bandi(nome_comune, url_bandi):
             righe = soup.find_all('tr')
             for riga in righe[1:]: 
                 colonne = riga.find_all('td')
-                if len(colonne) >= 4:
-                    titolo = colonne[3].get_text(strip=True)
-                    
-                    # IGNORIAMO i falsi link "#" e forziamo sempre un ID unico per ogni riga
-                    id_pubb = colonne[0].get_text(strip=True).replace(' ', '').replace('/', '-')
+                
+                # Estrae solo le colonne che contengono vero testo, ignorando quelle invisibili
+                testi = [c.get_text(strip=True) for c in colonne if c.get_text(strip=True)]
+                
+                if len(testi) >= 4:
+                    id_pubb = testi[0].replace(' ', '').replace('/', '-')
+                    titolo = testi[3]
                     link_bando = f"{url_bandi}&doc={id_pubb}"
-                        
                     data = datetime.today().strftime('%d/%m/%Y')
                     
-                    if titolo:
-                        bandi_trovati.append({
-                            "comune": nome_comune, 
-                            "titolo": titolo,
-                            "data_scadenza": data,
-                            "link": link_bando
-                        })
+                    bandi_trovati.append({
+                        "comune": nome_comune, 
+                        "titolo": titolo,
+                        "data_scadenza": data,
+                        "link": link_bando
+                    })
                         
         # LOGICA UNIVERSALE PER MONTESILVANO E PESCARA
         else:
