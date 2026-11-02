@@ -1,18 +1,28 @@
+import os
+import json
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 from supabase import create_client, Client
 from urllib.parse import urljoin
 import urllib3
+import firebase_admin
+from firebase_admin import credentials, messaging
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# 1. Configurazione Supabase
+# Configurazione Supabase
 SUPABASE_URL = "https://vdskoxutlhsdksbsplqp.supabase.co"
 SUPABASE_KEY = "sb_publishable_ENqtzU8uti18iFwlxF4IXQ_WgQ7cbOg" 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 2. Funzione di Scraping
+# Configurazione Firebase
+credenziali_firebase = os.environ.get("FIREBASE_CREDENTIALS")
+if credenziali_firebase:
+    cred_dict = json.loads(credenziali_firebase)
+    cred = credentials.Certificate(cred_dict)
+    firebase_admin.initialize_app(cred)
+
 def estrai_bandi(nome_comune, url_bandi):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] Cerco nuovi bandi per {nome_comune}...")
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
@@ -20,63 +30,39 @@ def estrai_bandi(nome_comune, url_bandi):
     try:
         response = requests.get(url_bandi, headers=headers, verify=False)
         response.raise_for_status() 
-        
         soup = BeautifulSoup(response.text, 'html.parser')
         bandi_trovati = []
         
-        # LOGICA SPECIFICA PER SPOLTORE
         if nome_comune == "Spoltore":
             righe = soup.find_all('tr')
             for riga in righe[1:]: 
                 colonne = riga.find_all('td')
-                
-                # Estrae solo le colonne che contengono vero testo, ignorando quelle invisibili
                 testi = [c.get_text(strip=True) for c in colonne if c.get_text(strip=True)]
-                
                 if len(testi) >= 4:
                     id_pubb = testi[0].replace(' ', '').replace('/', '-')
                     titolo = testi[3]
                     link_bando = f"{url_bandi}&doc={id_pubb}"
                     data = datetime.today().strftime('%d/%m/%Y')
-                    
-                    bandi_trovati.append({
-                        "comune": nome_comune, 
-                        "titolo": titolo,
-                        "data_scadenza": data,
-                        "link": link_bando
-                    })
-                        
-        # LOGICA UNIVERSALE PER MONTESILVANO E PESCARA
+                    bandi_trovati.append({"comune": nome_comune, "titolo": titolo, "data_scadenza": data, "link": link_bando})
         else:
             elementi_bando = soup.find_all('div', class_=lambda c: c and 'card' in c) 
-            
             for elemento in elementi_bando:
                 titolo_tag = elemento.find('h3', class_='card-title')
-                
                 if titolo_tag:
                     titolo = titolo_tag.text.strip()
                     tutti_i_link = elemento.find_all('a', href=True)
-                    
                     if tutti_i_link:
                         link_tag = max(tutti_i_link, key=lambda tag: len(tag['href']))
                         link_grezzo = link_tag['href']
                         data = datetime.today().strftime('%d/%m/%Y')
                         link_assoluto = urljoin(url_bandi, link_grezzo)
-                            
-                        bandi_trovati.append({
-                            "comune": nome_comune,
-                            "titolo": titolo,
-                            "data_scadenza": data,
-                            "link": link_assoluto
-                        })
-                    
+                        bandi_trovati.append({"comune": nome_comune, "titolo": titolo, "data_scadenza": data, "link": link_assoluto})
         return bandi_trovati
         
     except Exception as e:
         print(f"Errore di connessione per {nome_comune}: {e}")
         return []
 
-# 3. Salvataggio su Supabase
 def salva_bandi_supabase(bandi, nome_comune):
     if not bandi:
         return
@@ -86,36 +72,33 @@ def salva_bandi_supabase(bandi, nome_comune):
         risultato = supabase.table('bandi').select('id').eq('link', bando['link']).execute()
         
         if not risultato.data:
+            # Salva su database
             supabase.table('bandi').insert(bando).execute()
             nuovi_inserimenti += 1
             
+            # Invia Notifica Push
+            if credenziali_firebase:
+                try:
+                    messaggio = messaging.Message(
+                        notification=messaging.Notification(
+                            title=f"Nuovo avviso da {nome_comune}",
+                            body=bando['titolo'][:100] + ("..." if len(bando['titolo']) > 100 else "")
+                        ),
+                        topic="nuovi_bandi" # Invia il messaggio a questo canale globale
+                    )
+                    messaging.send(messaggio)
+                except Exception as e:
+                    print(f"Errore invio notifica: {e}")
+            
     print(f"-> {nome_comune}: Salvati {nuovi_inserimenti} nuovi bandi (su {len(bandi)} analizzati).")
 
-
-# --- MOTORE DI ESECUZIONE MULTIPLA ---
 if __name__ == "__main__":
-    
     comuni_da_monitorare = [
-        {
-            "nome": "Montesilvano",
-            "url": "https://www.comune.montesilvano.pe.it/Novita/Avvisi"
-        },
-        {
-            "nome": "Pescara",
-            "url": "https://comune.pescara.it/tipi_notizia/avvisi/"
-        },
-        {   
-            "nome": "Spoltore",
-            "url": "https://albo.tinnvision.cloud/?ente=00128340684"
-        }
+        {"nome": "Montesilvano", "url": "https://www.comune.montesilvano.pe.it/Novita/Avvisi"},
+        {"nome": "Pescara", "url": "https://comune.pescara.it/tipi_notizia/avvisi/"},
+        {"nome": "Spoltore", "url": "https://albo.tinnvision.cloud/?ente=00128340684"}
     ]
-    
-    print("Avvio scansione massiva...")
-    print("-" * 50)
     
     for comune in comuni_da_monitorare:
         dati_estratti = estrai_bandi(comune["nome"], comune["url"])
         salva_bandi_supabase(dati_estratti, comune["nome"])
-        print("-" * 50)
-        
-    print("Scansione completata!")
